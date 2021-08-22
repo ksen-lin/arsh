@@ -39,19 +39,11 @@ NEW_ARGV:
             
             dw      ehdrsize                        ;   e_ehsize
             dw      phdrsize                        ;   e_phentsize
-            dw      1                               ;   e_phnum
-_exit:
-            push NR_EXIT                            ;   e_shentsize
-            pop eax                                 ;   e_shnum
-            ; exit_code = random :D                 ;   e_shstrndx
-            int 0x80                              
-            db 0                        
+; Elf32_Phdr
+phdr:       dd      1                               ;   e_phnum, p_type                   
+            dd      0                               ;   e_shentsize, p_offset
             
 ehdrsize equ     $ - ehdr
-
-phdr:                                               ; Elf32_Phdr
-            dd      1                               ;   p_type
-            dd      0                               ;   p_offset
             dd      $$                              ;   p_vaddr
             dd      $$                              ;   p_paddr
             dd      filesize                        ;   p_filesz
@@ -110,7 +102,11 @@ _new_pid:
     jz sleep ; in child
     
     ;in parent
-    jmp _exit
+_exit:
+        push NR_EXIT                           
+        pop eax                                
+        ; exit_code = random :D                
+        int 0x80                              
     
     ; sleep(5)
     sleep:
